@@ -1,4 +1,5 @@
 Markdown
+> 🚧 **Active Development:** Currently building and integrating an AI-driven SOC tier-1 triage engine (Gemini API) to automate incident correlation and alert severity scoring.
 # Hybrid Cloud SOC: AWS Infrastructure & On-Premise MikroTik Security Monitoring via Wazuh SIEM
 
 A hybrid security operations monitoring infrastructure integrating Amazon Web Services (AWS) cloud telemetry and an on-premise MikroTik edge router into a centralized Wazuh SIEM deployed on AWS. The platform provides unified visibility across cloud control planes and local perimeter defenses, utilizing encrypted OpenVPN tunneling and native AWS API log ingestion.
@@ -111,7 +112,7 @@ Project Roadmap
 
 [x] Custom Log Decoders and Detection Rule Engineering
 
-[ ] AI-Driven Threat Triage: Integrate Gemini / OpenAI API to summarize alert contexts and generate remediation playbooks.
+[ ]🔄 AI-Driven Threat Triage: Integrate Gemini / OpenAI API to summarize alert contexts and generate remediation playbooks.
 
 [ ] Automated Incident Response (SOAR): Connect Shuffle SOAR to automatically push IP blocklists to the MikroTik firewall upon high-confidence alerts.
 
