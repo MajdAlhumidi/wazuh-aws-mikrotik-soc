@@ -1,58 +1,80 @@
+AmazonMacieReadOnlyAccess
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "WazuhCloudTrailAccess",
-      "Effect": "Allow",
-      "Action": [
-        "cloudtrail:Get*",
-        "cloudtrail:Describe*",
-        "cloudtrail:List*",
-        "cloudtrail:LookupEvents"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "WazuhS3BucketAccess",
-      "Effect": "Allow",
-      "Action": [
-        "s3:Get*",
-        "s3:List*",
-        "s3:Describe*",
-        "s3-object-lambda:Get*",
-        "s3-object-lambda:List*"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "WazuhCloudWatchLogsAccess",
-      "Effect": "Allow",
-      "Action": [
-        "logs:Describe*",
-        "logs:Get*",
-        "logs:List*",
-        "logs:StartQuery",
-        "logs:StopQuery",
-        "logs:TestMetricFilter",
-        "logs:FilterLogEvents",
-        "logs:StartLiveTail",
-        "logs:StopLiveTail",
-        "cloudwatch:GenerateQuery",
-        "cloudwatch:GenerateQueryResultsSummary"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "WazuhMacieAccess",
-      "Effect": "Allow",
-      "Action": [
-        "macie2:Describe*",
-        "macie2:Get*",
-        "macie2:List*",
-        "macie2:BatchGetCustomDataIdentifiers",
-        "macie2:SearchResources"
-      ],
-      "Resource": "*"
-    }
-  ]
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "macie2:Describe*",
+                "macie2:Get*",
+                "macie2:List*",
+                "macie2:BatchGetCustomDataIdentifiers",
+                "macie2:SearchResources"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+AmazonS3ReadOnlyAccess
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:Get*",
+                "s3:List*",
+                "s3:Describe*",
+                "s3-object-lambda:Get*",
+                "s3-object-lambda:List*"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+AWSCloudTrail_ReadOnlyAccess
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudtrail:Get*",
+                "cloudtrail:Describe*",
+                "cloudtrail:List*",
+                "cloudtrail:LookupEvents"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+CloudWatchLogsReadOnlyAccess
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "CloudWatchLogsReadOnlyAccess",
+            "Effect": "Allow",
+            "Action": [
+                "logs:Describe*",
+                "logs:Get*",
+                "logs:List*",
+                "logs:StartQuery",
+                "logs:StopQuery",
+                "logs:TestMetricFilter",
+                "logs:FilterLogEvents",
+                "logs:StartLiveTail",
+                "logs:StopLiveTail",
+                "cloudwatch:GenerateQuery",
+                "cloudwatch:GenerateQueryResultsSummary",
+                "observabilityadmin:ListS3TableIntegrations",
+                "observabilityadmin:GetS3TableIntegration",
+                "observabilityadmin:ListTelemetryPipelines"
+            ],
+            "Resource": "*"
+        }
+    ]
 }

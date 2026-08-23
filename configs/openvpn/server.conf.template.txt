@@ -1,0 +1,58 @@
+# ==============================================================================
+# OpenVPN Server Configuration Template for Wazuh Cloud SOC & MikroTik Integration
+# Target Architecture: AWS EC2 (Ubuntu) to On-Premise MikroTik RouterOS
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Network & Protocol Configuration
+# ------------------------------------------------------------------------------
+# MikroTik RouterOS traditional OVPN client primarily utilizes TCP mode
+port 1194
+proto tcp
+dev tun
+
+# Dedicated Point-to-Point VPN Subnet for Telemetry Transport
+server 10.8.0.0 255.255.255.0
+
+# Maintain record of client IP assignments across reconnects
+ifconfig-pool-persist /var/log/openvpn/ipp.txt
+
+# ------------------------------------------------------------------------------
+# 2. Cryptographic Materials & Certificates (Sanitized Templates)
+# ------------------------------------------------------------------------------
+ca /etc/openvpn/server/ca.crt
+cert /etc/openvpn/server/server.crt
+key /etc/openvpn/server/server.key
+dh /etc/openvpn/server/dh.pem
+
+# TLS and Ciphers compatible with RouterOS client implementations
+cipher AES-256-CBC
+auth SHA1
+
+# ------------------------------------------------------------------------------
+# 3. Connection Keepalive & Routing
+# ------------------------------------------------------------------------------
+# Ping every 10 seconds, assume connection dropped after 120 seconds
+keepalive 10 120
+
+# Optional: Directory for specific client static IP overrides (e.g., pinning MikroTik to 10.8.0.2)
+client-config-dir /etc/openvpn/ccd
+
+# Push route to allow client to reach the Wazuh private listening IP
+push "route 10.8.0.1 255.255.255.255"
+
+# ------------------------------------------------------------------------------
+# 4. Security Hardening & Privilege Dropping
+# ------------------------------------------------------------------------------
+user nobody
+group nogroup
+persist-key
+persist-tun
+
+# ------------------------------------------------------------------------------
+# 5. Logging & Diagnostics
+# ------------------------------------------------------------------------------
+status /var/log/openvpn/openvpn-status.log
+log-append /var/log/openvpn/openvpn.log
+verb 3
+mute 20
