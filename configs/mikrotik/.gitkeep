@@ -1,0 +1,44 @@
+# ==============================================================================
+# MikroTik RouterOS - Remote Syslog & Security Logging Setup for Wazuh SIEM
+# Description: Routes firewall, auth, and system events over OpenVPN to Wazuh.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Define Remote Logging Action (Point to Wazuh VPN IP)
+# ------------------------------------------------------------------------------
+/system logging action
+add name="wazuh-siem" \
+    target=remote \
+    remote=10.8.0.1 \
+    remote-port=514 \
+    src-address=10.8.0.2 \
+    bsd-syslog=yes \
+    syslog-facility=local0 \
+    syslog-severity=auto
+
+# ------------------------------------------------------------------------------
+# 2. Configure Logging Topics (Forward critical security events to Wazuh)
+# ------------------------------------------------------------------------------
+/system logging
+# Forward authentication and login attempts (Winbox, SSH, WebFig, VPN)
+add topics=account action=wazuh-siem
+add topics=system,error,critical action=wazuh-siem
+
+# Forward dropped firewall traffic and security rule matches
+add topics=firewall action=wazuh-siem
+
+# Optional: Track configuration changes by administrators
+add topics=system,info action=wazuh-siem
+
+# ------------------------------------------------------------------------------
+# 3. Sample Firewall Rules with Logging Enabled (For SIEM Ingestion)
+# ------------------------------------------------------------------------------
+/ip firewall filter
+# Log and drop invalid connections
+add chain=input connection-state=invalid action=drop log=yes log-prefix="FW_DROP_INVALID: " comment="Drop and log invalid packets"
+
+# Detect and log brute-force or unauthorized access to management ports
+add chain=input protocol=tcp dst-port=22,8291,80,443 in-interface-list=WAN action=drop log=yes log-prefix="FW_WAN_MGMT_BLOCKED: " comment="Log blocked WAN management access"
+
+# Log port scan or TCP SYN flood activity
+add chain=input protocol=tcp tcp-flags=syn connection-state=new action=passthrough log=yes log-prefix="FW_TCP_SCAN_DETECTED: " comment="Telemetry for port scan detection"

@@ -1,0 +1,12 @@
+<!-- Wazuh AWS Module: CloudTrail S3 Bucket Integration -->
+<wodle name="aws-s3">
+  <interval>1m</interval>
+  <run_on_start>yes</run_on_start>
+  <skip_on_error>yes</skip_on_error>
+
+  <bucket type="cloudtrail">
+    <name>aws-cloudtrail-logs-YOUR_ACCOUNT_ID-YOUR_SUFFIX</name>
+    <aws_profile>default</aws_profile>
+    <only_logs_after>2026-AUG-01</only_logs_after>
+  </bucket>
+</wodle>
