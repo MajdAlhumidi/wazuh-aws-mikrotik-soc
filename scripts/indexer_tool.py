@@ -8,8 +8,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # إعدادات الاتصال بـ Wazuh Indexer
 INDEXER_HOST = os.getenv("WAZUH_INDEXER_HOST", "https://localhost:9200")
-INDEXER_USER = os.getenv("WAZUH_INDEXER_USER", "admin")
-INDEXER_PASS = os.getenv("WAZUH_INDEXER_PASS", "admin") # عدّل كلمة المرور إذا كانت مختلفة لديك
+INDEXER_USER = os.getenv("WAZUH_INDEXER_USER", "")
+INDEXER_PASS = os.getenv("WAZUH_INDEXER_PASS", "")
 
 def get_opensearch_client() -> OpenSearch:
     return OpenSearch(
