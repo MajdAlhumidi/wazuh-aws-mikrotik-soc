@@ -11,8 +11,8 @@ from threat_intel import check_ip_reputation as get_ip_intel, check_file_hash as
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 WAZUH_HOST = os.getenv("WAZUH_API_HOST", "https://127.0.0.1:55000")
-WAZUH_USER = os.getenv("WAZUH_API_USER", "wazuh-wui")
-WAZUH_PASS = os.getenv("WAZUH_API_PASS", "MKPZeQWKIxmQ.WuP44OudU2WBIEkPnNu")
+WAZUH_USER = os.getenv("WAZUH_API_USER", "")
+WAZUH_PASS = os.getenv("WAZUH_API_PASS", "")
 
 
 def get_wazuh_token() -> str:
