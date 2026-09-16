@@ -1,0 +1,12 @@
+# Python ignores
+__pycache__/
+*.pyc
+venv/
+.env
+
+# OpenVPN & AWS keys
+*.ovpn
+*.key
+*.crt
+*.pem
+aws_credentials
