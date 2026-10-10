@@ -19,7 +19,7 @@ from agent_tools import (
 
 STREAM_API_URL = "http://127.0.0.1:8000/api/broadcast"
 
-def notify_stream(event_type: str, alert_json: dict, report_text: str = "", classification: str = "", case_id: str = "", containment_status: str = "NOT_EXECUTED"):
+def notify_stream(event_type: str, alert_json: dict, report_text: str = "", classification: str = "", case_id: str = "", containment_status: str = "NOT_EXECUTED", llm_provider: str = "unknown", llm_model: str = "unknown", fallback_used: bool = False):
     try:
         rule = alert_json.get("rule", {})
         agent = alert_json.get("agent", {})
@@ -35,7 +35,10 @@ def notify_stream(event_type: str, alert_json: dict, report_text: str = "", clas
             "payload": alert_json.get("full_log", ""),
             "report_text": report_text,
             "classification": classification,
-            "containment_status": containment_status
+            "containment_status": containment_status,
+            "llm_provider": llm_provider,
+            "llm_model": llm_model,
+            "fallback_used": fallback_used
         }
         requests.post(STREAM_API_URL, json=payload, timeout=1.0)
     except Exception:
@@ -410,7 +413,10 @@ def investigate_alert(alert_json: dict):
             report_text=report_text,
             classification=classification,
             case_id=case_id,
-            containment_status="NOT_EXECUTED"
+            containment_status="NOT_EXECUTED",
+            llm_provider=provider,
+            llm_model=model_name,
+            fallback_used=fallback_used
         )
         print(f"[✓] Broadcasted {case_id} to Dashboard.", flush=True)
     except Exception as save_err:
