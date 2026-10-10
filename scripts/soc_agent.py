@@ -181,15 +181,17 @@ def generate_fallback_report(alert_json: dict, error_msg: str) -> str:
 
     mitre_list = []
     log_lower = (full_log + " " + desc).lower()
-    if "powershell" in log_lower or "encoded" in log_lower:
-        mitre_list.append("* **T1059.001 – Command and Scripting Interpreter: PowerShell**: Obfuscated execution.")
-        mitre_list.append("* **T1027 – Obfuscated Files or Information**: Encoded parameters detected.")
+    powershell_execution_markers = ("-enc", "encodedcommand", "-command", "invoke-expression", "iex ")
+    if "powershell" in log_lower and any(term in log_lower for term in powershell_execution_markers):
+        mitre_list.append("* **T1059.001 – Command and Scripting Interpreter: PowerShell**: PowerShell command execution indicators are present; validate intent and surrounding behavior.")
+    if any(term in log_lower for term in ("-enc", "encodedcommand", "base64", "obfuscated")):
+        mitre_list.append("* **T1027 – Obfuscated Files or Information**: Encoding or obfuscation indicators are present; confirm they are not benign tooling.")
     if "credential stuffing" in log_lower:
-        mitre_list.append("* **T1110.004 – Credential Stuffing**: Explicit credential-stuffing activity is described in the event.")
-    elif any(term in log_lower for term in ("brute force", "repeated failed login", "multiple failed login", "authentication failure")):
-        mitre_list.append("* **T1110 – Brute Force**: Authentication-failure pattern is described; validate counts and context before confirming the technique.")
-    if any(term in log_lower for term in ("successful login", "successful authentication", "valid account used")):
-        mitre_list.append("* **T1078 – Valid Accounts**: Successful use of a valid account is indicated; verify the underlying authentication evidence.")
+        mitre_list.append("* **T1110.004 – Credential Stuffing**: Credential-stuffing activity is explicitly described; validate against event evidence.")
+    elif any(term in log_lower for term in ("brute force", "repeated failed login", "multiple failed login", "failed logins", "multiple authentication failures")):
+        mitre_list.append("* **T1110 – Brute Force**: Repeated authentication-failure behavior is described; validate counts and context before confirming the technique.")
+    if any(term in log_lower for term in ("valid account abused", "compromised account", "unauthorized successful login", "unusual successful login", "valid account used in suspicious")):
+        mitre_list.append("* **T1078 – Valid Accounts**: Evidence suggests possible abuse of a valid account; verify the underlying authentication and authorization context.")
 
     if not mitre_list:
         mitre_list.append("* No technique mapped: the available log text is insufficient to support a specific MITRE ATT&CK technique.")
