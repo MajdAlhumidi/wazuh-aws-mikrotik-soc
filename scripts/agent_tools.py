@@ -1,7 +1,6 @@
 import os
 import json
 import requests
-import urllib3
 
 from vector_store import search_incidents
 from indexer_tool import query_process_tree, query_network_activity
