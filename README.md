@@ -21,6 +21,8 @@ export SOC_OLLAMA_TIMEOUT_SECONDS=180
 Use `SOC_OLLAMA_URL` to point at a protected local endpoint or an explicitly configured SSH tunnel. Do not expose Ollama's API directly to the public internet. To use the optional Gemini path, set `SOC_LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, and optionally `GEMINI_MODEL`.
 
 
+### Verification, Containment, and Transport
+
 - **Classification is evidence-based triage:** a Wazuh rule level determines prioritization, not proof of compromise. Reports without enough evidence default to `suspicious` / human review rather than an automatically confirmed true positive.
 - **Containment is not currently automated:** `trigger_containment_action` returns `NOT_CONFIGURED` and `not_executed`. It deliberately does not claim to isolate a host or block an address. A real Wazuh Active Response adapter must be configured, tested, and audited before automated containment is enabled.
 - **Dashboard status reflects recorded evidence:** new records default to `Not executed`. An event is only shown as `Executed & Verified` when its stored status explicitly says `EXECUTED_AND_VERIFIED`.
