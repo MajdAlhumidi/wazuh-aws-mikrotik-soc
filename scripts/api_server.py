@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -110,7 +110,7 @@ class ExternalAlertInput(BaseModel):
     containment_status: str = "NOT_EXECUTED"
     llm_provider: str = "unknown"
     llm_model: str = "unknown"
-    fallback_used: bool | None = None
+    fallback_used: Optional[bool] = None
 
 @app.post("/api/broadcast")
 async def ingest_real_agent_alert(alert: ExternalAlertInput):
