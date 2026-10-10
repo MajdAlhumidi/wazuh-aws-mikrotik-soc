@@ -350,7 +350,7 @@ def investigate_alert(alert_json: dict):
                     temperature=0.1
                 )
             )
-            prompt = f"Perform a comprehensive Tier-2 investigation on this live Wazuh Alert JSON:\\n{json.dumps(alert_json, indent=2)}"
+            prompt = f"Perform a comprehensive Tier-2 investigation on this live Wazuh Alert JSON:\n{json.dumps(alert_json, indent=2)}"
             response = chat.send_message(prompt)
             report_text = response.text
         else:
