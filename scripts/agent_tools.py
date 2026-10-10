@@ -8,11 +8,10 @@ from indexer_tool import query_process_tree, query_network_activity
 from thehive_tool import create_thehive_incident_case
 from threat_intel import check_ip_reputation as get_ip_intel, check_file_hash as get_hash_intel
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 WAZUH_HOST = os.getenv("WAZUH_API_HOST", "https://127.0.0.1:55000")
 WAZUH_USER = os.getenv("WAZUH_API_USER", "")
 WAZUH_PASS = os.getenv("WAZUH_API_PASS", "")
+WAZUH_API_VERIFY_TLS = os.getenv("WAZUH_API_VERIFY_TLS", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_wazuh_token() -> str:
@@ -21,7 +20,7 @@ def get_wazuh_token() -> str:
         res = requests.post(
             f"{WAZUH_HOST}/security/user/authenticate",
             auth=(WAZUH_USER, WAZUH_PASS),
-            verify=False,
+            verify=WAZUH_API_VERIFY_TLS,
             timeout=5
         )
         if res.status_code == 200:
@@ -43,7 +42,7 @@ def search_related_agent_logs(agent_id: str, query: str) -> str:
             f"{WAZUH_HOST}/syscheck/{agent_id}/last_scan",
             headers=headers,
             params=params,
-            verify=False,
+            verify=WAZUH_API_VERIFY_TLS,
             timeout=5
         )
         return json.dumps(res.json().get("data", {}))
@@ -60,9 +59,8 @@ def check_ip_reputation(ip: str) -> str:
         intel_report = get_ip_intel(ip.strip())
         # إرفاق الملاحظة التشخيصية الفنية ليقرأها الوكيل
         intel_report["diagnostic_metadata"] = {
-            "execution_status": "SUCCESSFUL_LIVE_QUERY",
-            "api_connectivity": "AbuseIPDB & VirusTotal HTTP 200 OK",
-            "diagnostic_note": "تم الفحص الفعلي عبر الـ APIs المباشرة بنجاح. أي غياب سابق للنتائج كان بسبب توقف الكود عند مرحلة الاستيراد (ImportError) قبل الوصول لمرحلة الاستعلام الفعلي."
+            "execution_status": "QUERY_FUNCTION_RETURNED",
+            "diagnostic_note": "راجع نتائج كل مزود في التقرير؛ لا يتم افتراض رموز HTTP أو نجاح مزود غير ظاهر في الاستجابة."
         }
         return json.dumps(intel_report, ensure_ascii=False)
     except Exception as e:
@@ -84,8 +82,8 @@ def inspect_file_hash(file_hash: str) -> str:
     try:
         hash_report = get_hash_intel(file_hash.strip())
         hash_report["diagnostic_metadata"] = {
-            "execution_status": "SUCCESSFUL_LIVE_QUERY",
-            "api_connectivity": "VirusTotal v3 HTTP 200 OK"
+            "execution_status": "QUERY_FUNCTION_RETURNED",
+            "diagnostic_note": "لا يتم افتراض رمز HTTP أو نتيجة لم تُرجعها دالة مزود التهديدات."
         }
         return json.dumps(hash_report, ensure_ascii=False)
     except Exception as e:
@@ -93,11 +91,17 @@ def inspect_file_hash(file_hash: str) -> str:
 
 
 def trigger_containment_action(agent_id: str, command: str) -> str:
+    """Fail closed: this project has no verified active-response executor configured."""
     return json.dumps({
-        "status": "success",
+        "status": "not_executed",
+        "action_status": "NOT_CONFIGURED",
+        "executed": False,
         "action": command,
         "agent_id": agent_id,
-        "message": f"Containment action '{command}' executed successfully on Agent {agent_id}."
+        "message": (
+            "No containment action was executed. Configure and verify a real "
+            "Wazuh Active Response adapter before enabling automated containment."
+        )
     })
 
 
