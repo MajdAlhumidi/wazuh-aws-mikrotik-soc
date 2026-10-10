@@ -5,6 +5,15 @@ An autonomous hybrid security operations monitoring infrastructure integrating A
 
 ---
 
+## Incident Verification and Safe-Operation Notes
+
+- **Classification is evidence-based triage:** a Wazuh rule level determines prioritization, not proof of compromise. Reports without enough evidence default to `suspicious` / human review rather than an automatically confirmed true positive.
+- **Containment is not currently automated:** `trigger_containment_action` returns `NOT_CONFIGURED` and `not_executed`. It deliberately does not claim to isolate a host or block an address. A real Wazuh Active Response adapter must be configured, tested, and audited before automated containment is enabled.
+- **Dashboard status reflects recorded evidence:** new records default to `Not executed`. An event is only shown as `Executed & Verified` when its stored status explicitly says `EXECUTED_AND_VERIFIED`.
+- **Threat-intelligence and audit claims must come from tool results:** the agent should not invent HTTP status codes, provider successes, prior matches, or actions.
+- **TLS verification:** Wazuh API requests verify TLS by default through `WAZUH_API_VERIFY_TLS=true`. For an isolated test lab with a self-signed certificate only, this can be set to `false`; prefer installing/trusting the correct certificate instead of disabling verification.
+- **Existing vector-store records:** metadata created before these changes may not contain rule-level or containment-status fields. The dashboard treats absent containment status as `Not executed`, but historical classifications may still reflect the older classifier and should be reviewed before using them as ground truth.
+
 ## Architecture Overview
 
 +-------------------------------------------------------------------------------------------------------------+
