@@ -1,11 +1,25 @@
 Markdown
 # AI-Powered Hybrid Cloud SOC: AWS Infrastructure & On-Premise MikroTik Security Operations via Wazuh SIEM
 
-An autonomous hybrid security operations monitoring infrastructure integrating Amazon Web Services (AWS) cloud telemetry and an on-premise MikroTik edge router into a centralized Wazuh SIEM deployed on AWS. The platform provides unified visibility across cloud control planes and local perimeter defenses, backed by a custom **Autonomous AI SOC Agent** powered by Google Gemini and vector retrieval to automate Tier-1 incident triage, severity evaluation, and remediation reporting.
+An autonomous hybrid security operations monitoring infrastructure integrating Amazon Web Services (AWS) cloud telemetry and an on-premise MikroTik edge router into a centralized Wazuh SIEM deployed on AWS. The platform provides unified visibility across cloud control planes and local perimeter defenses, backed by a custom AI SOC Agent that uses **local Ollama by default** (with optional Google Gemini support) and ChromaDB retrieval for Tier-1 incident triage and remediation reporting.
 
 ---
 
 ## Incident Verification and Safe-Operation Notes
+
+### LLM Provider Configuration
+
+Ollama is the default backend. Ensure the model exists in your Ollama installation and set these variables in the SOC agent process environment when needed:
+
+```bash
+export SOC_LLM_PROVIDER=ollama
+export SOC_OLLAMA_URL=http://127.0.0.1:11434/api/chat
+export SOC_OLLAMA_MODEL=qwen2.5:7b
+export SOC_OLLAMA_TIMEOUT_SECONDS=180
+```
+
+Use `SOC_OLLAMA_URL` to point at a protected local endpoint or an explicitly configured SSH tunnel. Do not expose Ollama's API directly to the public internet. To use the optional Gemini path, set `SOC_LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, and optionally `GEMINI_MODEL`.
+
 
 - **Classification is evidence-based triage:** a Wazuh rule level determines prioritization, not proof of compromise. Reports without enough evidence default to `suspicious` / human review rather than an automatically confirmed true positive.
 - **Containment is not currently automated:** `trigger_containment_action` returns `NOT_CONFIGURED` and `not_executed`. It deliberately does not claim to isolate a host or block an address. A real Wazuh Active Response adapter must be configured, tested, and audited before automated containment is enabled.
@@ -29,7 +43,7 @@ An autonomous hybrid security operations monitoring infrastructure integrating A
 |                                                     Alerts (JSON)  v                 |                      |
 |                                                        +----------------------------------------+           |
 |                                                        | Autonomous AI SOC Agent (Python)       |           |
-|                                                        | - Google Gemini Reasoning Engine       |           |
+|                                                        | - Ollama (default) / Gemini (optional) |           |
 |                                                        | - ChromaDB Vector Retrieval (RAG)      |           |
 |                                                        | - Automated Triage & Incident Reports  |           |
 |                                                        +----------------------------------------+           |
@@ -57,7 +71,7 @@ v
 | **Edge Router** | MikroTik RouterOS | Telemetry source for network perimeter, dropped traffic, and admin auth |
 | **Secure Transit** | OpenVPN | Site-to-Cloud encrypted tunnel preventing public exposure of Syslog data |
 | **Log Routing** | Remote Syslog (`rsyslog`) | Ingesting MikroTik UDP log stream on the private VPN interface |
-| **AI Investigation** | Python, Google Gemini API, ChromaDB | Automated alert contextualization, IOC enrichment, and triage generation |
+| **AI Investigation** | Python, Ollama (local default), optional Gemini, ChromaDB | Alert contextualization, local historical retrieval, and triage reporting |
 
 ---
 
@@ -128,7 +142,7 @@ Implemented regex decoders and custom rules (Rule IDs 100100+) to parse RouterOS
 4. Autonomous AI SOC Agent Integration
 Developed an AI triage pipeline in Python (soc_agent.py) triggered by high-severity Wazuh alerts.
 
-Leveraged Google Gemini API to analyze alert telemetry, classify attack vectors, and extract relevant indicators.
+Configured the SOC agent to use the local Ollama HTTP API by default (model: `qwen2.5:7b`), with Google Gemini available when `SOC_LLM_PROVIDER=gemini`. Local Ollama mode includes ChromaDB history retrieval and does not query external threat-intelligence services.
 
 Integrated ChromaDB vector store for similarity search across historical incidents to enrich investigation reports.
 
