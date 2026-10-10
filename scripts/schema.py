@@ -21,6 +21,9 @@ class IncidentRecord(BaseModel):
     raw_logs: str
     rule_level: int = 0
     containment_status: str = "NOT_EXECUTED"
+    llm_provider: str = "unknown"
+    llm_model: str = "unknown"
+    fallback_used: bool = False
 
     def to_document_text(self) -> str:
         text = (
@@ -47,7 +50,10 @@ class IncidentRecord(BaseModel):
             "source_ip": self.source_ip,
             "destination_ip": self.destination_ip,
             "rule_level": self.rule_level,
-            "containment_status": self.containment_status
+            "containment_status": self.containment_status,
+            "llm_provider": self.llm_provider,
+            "llm_model": self.llm_model,
+            "fallback_used": self.fallback_used
         }
 
 
