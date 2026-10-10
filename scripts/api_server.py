@@ -30,8 +30,15 @@ def get_real_incidents_from_chroma() -> List[Dict[str, Any]]:
         for i in reversed(range(total)):
             case_id = data["ids"][i]
             meta = data["metadatas"][i] if data.get("metadatas") else {}
-            cls = meta.get("classification", "unknown").lower()
-            is_tp = "true" in cls
+            cls = str(meta.get("classification", "unknown")).strip().lower()
+            verdict_by_class = {
+                "true_positive": "Critical TP",
+                "false_positive": "Benign/FP",
+                "benign": "Benign",
+                "suspicious": "Suspicious / Review",
+                "unknown": "Suspicious / Review"
+            }
+            verdict = verdict_by_class.get(cls, "Suspicious / Review")
 
             host = meta.get("destination_ip", "local-agent")
             src_ip = meta.get("source_ip", "N/A")
@@ -39,14 +46,24 @@ def get_real_incidents_from_chroma() -> List[Dict[str, Any]]:
             rule = meta.get("rule_name", "Security Alert")
             notes = meta.get("analyst_notes", "No investigation notes recorded.")
 
+            raw_timestamp = str(meta.get("timestamp", datetime.now().strftime("%H:%M:%S")))
+            display_time = raw_timestamp[11:19] if len(raw_timestamp) >= 19 and "T" in raw_timestamp else raw_timestamp
+            action_status = str(meta.get("containment_status", "NOT_EXECUTED")).upper()
+            if action_status == "EXECUTED_AND_VERIFIED":
+                containment_label = "Executed & Verified"
+            elif action_status == "FAILED":
+                containment_label = "Failed"
+            else:
+                containment_label = "Not executed"
+
             real_incidents.append({
                 "case_id": case_id,
-                "time": meta.get("timestamp", datetime.now().strftime("%H:%M:%S")),
+                "time": display_time,
                 "host_agent": host if host != "N/A" else "local-agent",
-                "level": 10 if is_tp else 7,
+                "level": int(meta.get("rule_level", 0) or 0),
                 "rule_name": rule,
-                "verdict": "Critical TP" if is_tp else "Benign/FP",
-                "containment": "Isolated" if is_tp else "Active",
+                "verdict": verdict,
+                "containment": containment_label,
                 "details": notes,
                 "source_ip": src_ip,
                 "user": user
@@ -87,12 +104,28 @@ class ExternalAlertInput(BaseModel):
     payload: str = ""
     report_text: str = ""
     classification: str = ""
+    containment_status: str = "NOT_EXECUTED"
 
 @app.post("/api/broadcast")
 async def ingest_real_agent_alert(alert: ExternalAlertInput):
     """بث التقرير المحفوظ في ChromaDB إلى المتصفح لحظياً"""
-    is_tp = "TRUE" in alert.classification.upper()
+    classification = alert.classification.strip().lower()
+    verdict_by_class = {
+        "true_positive": "Critical TP",
+        "false_positive": "Benign/FP",
+        "benign": "Benign",
+        "suspicious": "Suspicious / Review",
+        "unknown": "Suspicious / Review"
+    }
+    verdict = verdict_by_class.get(classification, "Suspicious / Review")
     now_time = datetime.now().strftime("%H:%M:%S")
+    action_status = alert.containment_status.strip().upper()
+    if action_status == "EXECUTED_AND_VERIFIED":
+        containment_label = "Executed & Verified"
+    elif action_status == "FAILED":
+        containment_label = "Failed"
+    else:
+        containment_label = "Not executed"
 
     new_record = {
         "case_id": alert.case_id if alert.case_id else f"INC-{datetime.now().strftime('%Y%m%d')}-LIVE",
@@ -100,8 +133,8 @@ async def ingest_real_agent_alert(alert: ExternalAlertInput):
         "host_agent": alert.target_host,
         "level": alert.rule_level,
         "rule_name": alert.rule_desc,
-        "verdict": "Critical TP" if is_tp else "Benign/FP",
-        "containment": "Isolated" if is_tp else "Active",
+        "verdict": verdict,
+        "containment": containment_label,
         "details": alert.report_text,
         "source_ip": alert.source_ip,
         "user": "N/A"
@@ -258,7 +291,7 @@ async def serve_ui():
     let allIncidents = [];
     let selectedId = null;
     let currentFilter = "All";
-    const filterOptions = ["All", "Critical TP", "Benign/FP"];
+    const filterOptions = ["All", "Critical TP", "Suspicious / Review", "Benign/FP", "Benign"];
 
     const tbody = document.getElementById('incidents-tbody');
     const targetTitle = document.getElementById('target-title');
@@ -306,16 +339,7 @@ async def serve_ui():
 
         tr.onclick = () => selectIncident(inc.case_id);
 
-        tr.innerHTML = `
-          <td>${inc.case_id}</td>
-          <td>${inc.time}</td>
-          <td>${inc.host_agent}</td>
-          <td>${inc.level}</td>
-          <td>${inc.rule_name}</td>
-          <td>${inc.verdict}</td>
-          <td>${inc.containment}</td>
-        `;
-        tbody.appendChild(tr);
+        [inc.case_id, inc.time, inc.host_agent, inc.level, inc.rule_name, inc.verdict, inc.containment].forEach(value => {\n          const td = document.createElement('td');\n          td.textContent = String(value ?? '');\n          tr.appendChild(td);\n        });\n        tbody.appendChild(tr);
       });
 
       updateMetrics();
