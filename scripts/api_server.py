@@ -373,7 +373,7 @@ async def serve_ui():
 
       targetTitle.innerText = `${item.case_id} - HOST: ${item.host_agent.toUpperCase()}`;
       verdictBadge.innerText = `VERDICT: ${item.verdict.toUpperCase()}`;
-      verdictBadge.style.color = item.verdict.includes("Critical") ? "#fca5a5" : "#7dd3fc";
+      verdictBadge.style.color = item.verdict.includes("Critical") ? "#fca5a5" : (item.verdict.includes("Suspicious") ? "#fcd34d" : "#7dd3fc");
       const fallbackLabel = item.fallback_used === true ? "Yes" : (item.fallback_used === false ? "No" : "Unknown");
       detailsDesc.innerText = String(item.details || "") +
         "\n\n--- Execution Audit ---" +
