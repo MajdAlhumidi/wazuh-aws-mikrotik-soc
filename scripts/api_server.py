@@ -188,6 +188,7 @@ async def serve_ui():
     tr.row-critical:hover { background-color: #2e161c; }
 
     tr.row-benign { background-color: #121c2e; color: #7dd3fc; }
+    tr.row-suspicious { background-color: #2a2112; color: #fcd34d; }
     tr.row-benign td:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
     tr.row-benign td:last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
     tr.row-benign:hover { background-color: #182740; }
@@ -256,7 +257,7 @@ async def serve_ui():
     <div class="detail-card">
       <div id="target-title" class="target-title">SELECT AN INCIDENT</div>
       <div id="verdict-badge" class="verdict-badge">---</div>
-      <div id="details-desc" class="details-desc">Select an incident from the table above to read the actual Gemini investigation report from ChromaDB.</div>
+      <div id="details-desc" class="details-desc">Select an incident from the table above to read its investigation report from ChromaDB.</div>
     </div>
 
     <div class="metrics-bar">
@@ -334,12 +335,18 @@ async def serve_ui():
       filtered.forEach(inc => {
         const tr = document.createElement('tr');
         const isCritical = inc.verdict.includes("Critical") || inc.verdict.includes("TP");
-        tr.className = isCritical ? 'row-critical' : 'row-benign';
+        const isSuspicious = inc.verdict.includes("Suspicious");
+        tr.className = isCritical ? 'row-critical' : (isSuspicious ? 'row-suspicious' : 'row-benign');
         if (inc.case_id === selectedId) tr.classList.add('selected');
 
         tr.onclick = () => selectIncident(inc.case_id);
 
-        [inc.case_id, inc.time, inc.host_agent, inc.level, inc.rule_name, inc.verdict, inc.containment].forEach(value => {\n          const td = document.createElement('td');\n          td.textContent = String(value ?? '');\n          tr.appendChild(td);\n        });\n        tbody.appendChild(tr);
+        [inc.case_id, inc.time, inc.host_agent, inc.level, inc.rule_name, inc.verdict, inc.containment].forEach(value => {
+          const td = document.createElement('td');
+          td.textContent = String(value ?? '');
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
       });
 
       updateMetrics();
