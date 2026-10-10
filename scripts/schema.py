@@ -6,7 +6,7 @@ from datetime import datetime
 class IncidentRecord(BaseModel):
     incident_id: str
     rule_name: str
-    classification: Literal["true_positive", "false_positive"]
+    classification: Literal["true_positive", "false_positive", "suspicious", "benign", "unknown"]
     analyst_notes: str
     diagnostic_and_audit_notes: str = Field(
         default="",
@@ -19,6 +19,8 @@ class IncidentRecord(BaseModel):
     destination_ip: str
     user_account: str
     raw_logs: str
+    rule_level: int = 0
+    containment_status: str = "NOT_EXECUTED"
 
     def to_document_text(self) -> str:
         text = (
@@ -41,7 +43,11 @@ class IncidentRecord(BaseModel):
             "analyst_notes": self.analyst_notes,
             "diagnostic_notes": self.diagnostic_and_audit_notes,
             "timestamp": self.timestamp,
-            "user_account": self.user_account
+            "user_account": self.user_account,
+            "source_ip": self.source_ip,
+            "destination_ip": self.destination_ip,
+            "rule_level": self.rule_level,
+            "containment_status": self.containment_status
         }
 
 
