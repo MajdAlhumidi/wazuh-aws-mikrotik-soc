@@ -71,7 +71,7 @@ You MUST produce the final investigation report strictly formatted in Markdown:
 ---
 
 ### 1. Incident Classification & Severity Level
-* **Classification**: [TRUE POSITIVE or FALSE POSITIVE]
+* **Classification**: [TRUE POSITIVE / FALSE POSITIVE / SUSPICIOUS / BENIGN]
 * **Severity Level**: [CRITICAL / HIGH / MEDIUM / LOW]
 * **Alert Description**: [Rule description]
 * **Affected Host**: `[Host name or IP]`
@@ -83,7 +83,7 @@ You MUST produce the final investigation report strictly formatted in Markdown:
 ### 2. Analysis & Technical Findings
 * **Command / Activity**:
 * **Payload Analysis**: [Deconstruct parameters, flags, Base64 decoding, or behavior]
-* **Threat Intelligence Findings**: [Details from AbuseIPDB, VirusTotal, and GreyNoise reputation checks]
+* **Threat Intelligence Findings**: [Only providers actually queried and results returned by tools; otherwise state not checked]
 * **Account / Service Vulnerability**: [Analysis of user context]
 
 ---
@@ -101,7 +101,7 @@ You MUST produce the final investigation report strictly formatted in Markdown:
 
 ### 5. Containment & Remediation Status
 1. **Host Isolation**: [Executed and verified / Not executed / Failed / Unknown]
-2. **Case Creation**: [Executed and verified / Not executed / Failed / Unknown]
+2. **External Case Creation**: [Executed and verified only if a case-creation tool result is present; otherwise Not attempted / Not configured]
 
 ---
 
