@@ -332,6 +332,12 @@ def investigate_alert(alert_json: dict):
     classification = "suspicious"
 
     provider = os.getenv("SOC_LLM_PROVIDER", "ollama").strip().lower()
+    model_name = (
+        os.getenv("SOC_OLLAMA_MODEL", "qwen2.5:7b")
+        if provider == "ollama"
+        else os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    )
+    fallback_used = False
 
     try:
         if provider == "ollama":
@@ -359,6 +365,7 @@ def investigate_alert(alert_json: dict):
         classification = extract_report_classification(report_text)
 
     except Exception as api_err:
+        fallback_used = True
         print(f"[!] {provider} provider unavailable ({str(api_err)}). Switching to Deterministic Fallback Pipeline...", flush=True)
         report_text = generate_fallback_report(alert_json, str(api_err))
         classification = extract_report_classification(report_text)
@@ -389,7 +396,10 @@ def investigate_alert(alert_json: dict):
             analyst_notes=report_text.strip(),
             diagnostic_and_audit_notes=diagnostic_text,
             rule_level=int(rule_level or 0),
-            containment_status="NOT_EXECUTED"
+            containment_status="NOT_EXECUTED",
+            llm_provider=provider,
+            llm_model=model_name,
+            fallback_used=fallback_used
         )
         store_incidents([record])
         print(f"[✓] Stored {case_id} in ChromaDB permanently.", flush=True)
