@@ -66,7 +66,10 @@ def get_real_incidents_from_chroma() -> List[Dict[str, Any]]:
                 "containment": containment_label,
                 "details": notes,
                 "source_ip": src_ip,
-                "user": user
+                "user": user,
+                "llm_provider": meta.get("llm_provider", "unknown"),
+                "llm_model": meta.get("llm_model", "unknown"),
+                "fallback_used": meta.get("fallback_used")
             })
 
         return real_incidents
@@ -105,6 +108,9 @@ class ExternalAlertInput(BaseModel):
     report_text: str = ""
     classification: str = ""
     containment_status: str = "NOT_EXECUTED"
+    llm_provider: str = "unknown"
+    llm_model: str = "unknown"
+    fallback_used: bool | None = None
 
 @app.post("/api/broadcast")
 async def ingest_real_agent_alert(alert: ExternalAlertInput):
@@ -137,7 +143,10 @@ async def ingest_real_agent_alert(alert: ExternalAlertInput):
         "containment": containment_label,
         "details": alert.report_text,
         "source_ip": alert.source_ip,
-        "user": "N/A"
+        "user": "N/A",
+        "llm_provider": alert.llm_provider,
+        "llm_model": alert.llm_model,
+        "fallback_used": alert.fallback_used
     }
 
     await manager.broadcast({"type": "NEW_ALERT", "incident": new_record})
@@ -365,7 +374,13 @@ async def serve_ui():
       targetTitle.innerText = `${item.case_id} - HOST: ${item.host_agent.toUpperCase()}`;
       verdictBadge.innerText = `VERDICT: ${item.verdict.toUpperCase()}`;
       verdictBadge.style.color = item.verdict.includes("Critical") ? "#fca5a5" : "#7dd3fc";
-      detailsDesc.innerText = item.details;
+      const fallbackLabel = item.fallback_used === true ? "Yes" : (item.fallback_used === false ? "No" : "Unknown");
+      detailsDesc.innerText = String(item.details || "") +
+        "\n\n--- Execution Audit ---" +
+        "\nProvider: " + String(item.llm_provider || "unknown") +
+        "\nModel: " + String(item.llm_model || "unknown") +
+        "\nDeterministic fallback used: " + fallbackLabel +
+        "\nContainment status: " + String(item.containment || "Not executed");
     }
 
     function updateMetrics() {
