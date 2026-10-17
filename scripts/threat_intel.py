@@ -28,124 +28,186 @@ def is_valid_hash(file_hash: str) -> bool:
 
 def check_abuseipdb(ip: str) -> dict:
     if not ABUSEIPDB_KEY:
-        return {"abuse_score": 0, "total_reports": 0, "country": "N/A", "isp": "N/A"}
+        return {
+            "status": "not_configured",
+            "abuse_score": None,
+            "total_reports": None,
+            "country": "N/A",
+            "isp": "N/A",
+        }
 
     url = "https://api.abuseipdb.com/api/v2/check"
     headers = {"Key": ABUSEIPDB_KEY, "Accept": "application/json"}
     params = {"ipAddress": ip, "maxAgeInDays": "90"}
-
     try:
         res = requests.get(url, headers=headers, params=params, timeout=5)
         if res.status_code == 200:
             data = res.json().get("data", {})
             return {
-                "abuse_score": data.get("abuseConfidenceScore", 0),
-                "total_reports": data.get("totalReports", 0),
+                "status": "ok",
+                "abuse_score": data.get("abuseConfidenceScore"),
+                "total_reports": data.get("totalReports"),
                 "country": data.get("countryCode", "N/A"),
-                "isp": data.get("isp", "Unknown")
+                "isp": data.get("isp", "Unknown"),
             }
-        elif res.status_code == 429:
-            print("[!] AbuseIPDB: Daily Rate Limit reached.")
-    except Exception as e:
-        print(f"[!] AbuseIPDB Error: {e}")
-
-    return {"abuse_score": 0, "total_reports": 0, "country": "N/A", "isp": "Unknown"}
+        if res.status_code == 429:
+            return {"status": "rate_limited", "http_status": 429, "abuse_score": None, "total_reports": None}
+        return {
+            "status": "http_error",
+            "http_status": res.status_code,
+            "abuse_score": None,
+            "total_reports": None,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc), "abuse_score": None, "total_reports": None}
 
 
 def check_virustotal(ip: str) -> dict:
     if not VT_KEY:
-        return {"malicious": 0, "suspicious": 0}
+        return {"status": "not_configured", "malicious": None, "suspicious": None}
 
-    url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip}"
+    url = "https://www.virustotal.com/api/v3/ip_addresses/{}".format(ip)
     headers = {"x-apikey": VT_KEY}
-
     try:
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             stats = res.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
             return {
+                "status": "ok",
                 "malicious": stats.get("malicious", 0),
-                "suspicious": stats.get("suspicious", 0)
+                "suspicious": stats.get("suspicious", 0),
             }
-        elif res.status_code == 429:
-            print("[!] VirusTotal: Rate limit reached (4 req/min).")
-    except Exception as e:
-        print(f"[!] VirusTotal Error: {e}")
-
-    return {"malicious": 0, "suspicious": 0}
+        if res.status_code == 429:
+            return {"status": "rate_limited", "http_status": 429, "malicious": None, "suspicious": None}
+        return {
+            "status": "http_error",
+            "http_status": res.status_code,
+            "malicious": None,
+            "suspicious": None,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc), "malicious": None, "suspicious": None}
 
 
 def check_greynoise(ip: str) -> dict:
     if not GREYNOISE_KEY:
-        return {"noise": False, "riot": False, "classification": "unknown"}
+        return {
+            "status": "not_configured",
+            "noise": None,
+            "riot": None,
+            "classification": "unknown",
+        }
 
-    url = f"https://api.greynoise.io/v3/community/{ip}"
+    url = "https://api.greynoise.io/v3/community/{}".format(ip)
     headers = {"key": GREYNOISE_KEY, "Accept": "application/json"}
-
     try:
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             data = res.json()
             return {
+                "status": "ok",
                 "noise": data.get("noise", False),
                 "riot": data.get("riot", False),
-                "classification": data.get("classification", "unknown")
+                "classification": data.get("classification", "unknown"),
             }
-    except Exception as e:
-        print(f"[!] GreyNoise Error: {e}")
-
-    return {"noise": False, "riot": False, "classification": "unknown"}
+        if res.status_code == 429:
+            return {
+                "status": "rate_limited",
+                "http_status": 429,
+                "noise": None,
+                "riot": None,
+                "classification": "unknown",
+            }
+        return {
+            "status": "http_error",
+            "http_status": res.status_code,
+            "noise": None,
+            "riot": None,
+            "classification": "unknown",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "error": str(exc),
+            "noise": None,
+            "riot": None,
+            "classification": "unknown",
+        }
 
 
 def check_ip_reputation(ip: str) -> dict:
-    """تقييم سمعة عنوان IP."""
+    """Do not treat missing credentials or failed provider requests as a clean reputation result."""
     if not is_valid_public_ip(ip):
+        try:
+            address = ipaddress.ip_address(ip)
+            classification = (
+                "INTERNAL_OR_PRIVATE"
+                if address.is_private or address.is_loopback
+                else "NON_PUBLIC_OR_RESERVED"
+            )
+        except ValueError:
+            classification = "INVALID_IP"
         return {
+            "status": "not_applicable",
             "ip": ip,
-            "classification": "INTERNAL_OR_PRIVATE",
-            "severity": "LOW",
-            "recommended_action": "IGNORE",
-            "details": "Private or loopback IP."
+            "classification": classification,
+            "severity": "INFORMATIONAL",
+            "recommended_action": "MANUAL_REVIEW",
+            "details": "External reputation lookup was not performed for an invalid, private, loopback, or reserved address.",
         }
 
     abuse = check_abuseipdb(ip)
     vt = check_virustotal(ip)
     gn = check_greynoise(ip)
+    statuses = {
+        "abuseipdb": abuse.get("status", "unknown"),
+        "virustotal": vt.get("status", "unknown"),
+        "greynoise": gn.get("status", "unknown"),
+    }
+    successful = [name for name, status in statuses.items() if status == "ok"]
+    if not successful:
+        all_unconfigured = all(status == "not_configured" for status in statuses.values())
+        return {
+            "status": "not_configured" if all_unconfigured else "unavailable",
+            "ip": ip,
+            "classification": "UNKNOWN",
+            "severity": "UNKNOWN",
+            "recommended_action": "MANUAL_REVIEW",
+            "provider_status": statuses,
+            "details": "No provider returned usable reputation evidence; this is not a clean verdict.",
+        }
 
-    score = abuse["abuse_score"]
-    vt_malicious = vt["malicious"]
-    is_noise = gn["noise"]
-    is_riot = gn["riot"]
+    abuse_score = (abuse.get("abuse_score") or 0) if statuses["abuseipdb"] == "ok" else 0
+    vt_malicious = (vt.get("malicious") or 0) if statuses["virustotal"] == "ok" else 0
+    vt_suspicious = (vt.get("suspicious") or 0) if statuses["virustotal"] == "ok" else 0
+    is_noise = bool(gn.get("noise")) if statuses["greynoise"] == "ok" else False
+    is_riot = bool(gn.get("riot")) if statuses["greynoise"] == "ok" else False
 
     if is_riot:
-        classification = "BENIGN_SERVICE"
-        action = "ALLOW"
-        severity = "LOW"
-    elif score >= 50 or vt_malicious >= 3:
-        classification = "MALICIOUS_HOST"
-        action = "BLOCK"
-        severity = "CRITICAL"
-    elif is_noise or score >= 20 or vt_malicious >= 1:
-        classification = "SUSPICIOUS_SCANNER"
-        action = "RATE_LIMIT"
-        severity = "MEDIUM"
+        classification, action, severity = "BENIGN_SERVICE", "MONITOR", "LOW"
+    elif abuse_score >= 50 or vt_malicious >= 3:
+        classification, action, severity = "MALICIOUS_HOST", "MANUAL_REVIEW", "CRITICAL"
+    elif is_noise or abuse_score >= 20 or vt_malicious >= 1 or vt_suspicious > 0:
+        classification, action, severity = "SUSPICIOUS_SCANNER", "MANUAL_REVIEW", "MEDIUM"
     else:
-        classification = "CLEAN_OR_UNKNOWN"
-        action = "MONITOR"
-        severity = "LOW"
+        classification, action, severity = "CLEAN_OR_UNKNOWN", "MONITOR", "LOW"
 
     return {
+        "status": "success" if len(successful) == len(statuses) else "partial",
         "ip": ip,
         "classification": classification,
         "severity": severity,
         "recommended_action": action,
+        "provider_status": statuses,
         "details": {
-            "abuse_score": score,
-            "abuse_reports": abuse["total_reports"],
-            "vt_malicious_engines": vt_malicious,
-            "isp": abuse.get("isp"),
-            "country": abuse.get("country")
-        }
+            "abuse_score": abuse.get("abuse_score") if statuses["abuseipdb"] == "ok" else None,
+            "abuse_reports": abuse.get("total_reports") if statuses["abuseipdb"] == "ok" else None,
+            "vt_malicious_engines": vt.get("malicious") if statuses["virustotal"] == "ok" else None,
+            "vt_suspicious_engines": vt.get("suspicious") if statuses["virustotal"] == "ok" else None,
+            "greynoise_classification": gn.get("classification") if statuses["greynoise"] == "ok" else None,
+            "isp": abuse.get("isp") if statuses["abuseipdb"] == "ok" else None,
+            "country": abuse.get("country") if statuses["abuseipdb"] == "ok" else None,
+        },
     }
 
 
