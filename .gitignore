@@ -10,3 +10,5 @@ venv/
 *.crt
 *.pem
 aws_credentials
+logs/
+*.jsonl
