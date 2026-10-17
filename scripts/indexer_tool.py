@@ -3,20 +3,24 @@ import json
 import urllib3
 from opensearchpy import OpenSearch
 
-# تعطيل تحذيرات الشهادات غير الموثوقة (Self-signed certificates)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 # إعدادات الاتصال بـ Wazuh Indexer
 INDEXER_HOST = os.getenv("WAZUH_INDEXER_HOST", "https://localhost:9200")
 INDEXER_USER = os.getenv("WAZUH_INDEXER_USER", "")
 INDEXER_PASS = os.getenv("WAZUH_INDEXER_PASS", "")
+INDEXER_VERIFY_TLS = os.getenv("WAZUH_INDEXER_VERIFY_TLS", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+if not INDEXER_VERIFY_TLS:
+    # Only suppress warnings when an isolated lab explicitly disables verification.
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def get_opensearch_client() -> OpenSearch:
     return OpenSearch(
         hosts=[INDEXER_HOST],
         http_auth=(INDEXER_USER, INDEXER_PASS),
-        verify_certs=False,
-        ssl_show_warn=False
+        verify_certs=INDEXER_VERIFY_TLS,
+        ssl_show_warn=INDEXER_VERIFY_TLS,
+        timeout=10,
     )
 
 def query_process_tree(agent_id: str, time_range_minutes: int = 30) -> str:
