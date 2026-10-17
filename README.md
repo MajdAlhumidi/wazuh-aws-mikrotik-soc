@@ -23,7 +23,7 @@ export SOC_THEHIVE_AUTO_CREATE=false
 
 Use `SOC_OLLAMA_URL` to point at a protected local endpoint or an explicitly configured SSH tunnel. Do not expose Ollama's API directly to the public internet. Choose a model that supports tool calling. To use the optional Gemini path, set `SOC_LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, and optionally `GEMINI_MODEL`.
 
-The investigation loop defaults to six tool calls per alert and clamps the configured budget to twelve. The JSONL audit log is written to the configured path, which defaults to logs/agent_audit.jsonl. To create real TheHive cases, set THEHIVE_URL and THEHIVE_API_KEY, then explicitly enable SOC_THEHIVE_AUTO_CREATE=true. TLS verification is enabled by default; install a trusted certificate or set THEHIVE_VERIFY_TLS=false only in an isolated test lab.
+The investigation loop defaults to six tool calls per alert and clamps the configured budget to twelve. The JSONL audit log is written to the configured path, which defaults to logs/agent_audit.jsonl. To create real TheHive cases, set THEHIVE_URL and THEHIVE_API_KEY, choose THEHIVE_API_VERSION=v4 or THEHIVE_API_VERSION=v5 for your deployment, then explicitly enable SOC_THEHIVE_AUTO_CREATE=true. The default API version is v4 for backward compatibility. A case is reported as created only when its response includes a case ID; failures to add observables or follow-up tasks are reported as partial. TLS verification is enabled by default; install a trusted certificate or set THEHIVE_VERIFY_TLS=false only in an isolated test lab.
 
 
 ### Verification, Containment, and Transport
