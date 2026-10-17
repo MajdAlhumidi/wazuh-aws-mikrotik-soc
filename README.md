@@ -1,7 +1,7 @@
 Markdown
 # AI-Powered Hybrid Cloud SOC: AWS Infrastructure & On-Premise MikroTik Security Operations via Wazuh SIEM
 
-An autonomous hybrid security operations monitoring infrastructure integrating Amazon Web Services (AWS) cloud telemetry and an on-premise MikroTik edge router into a centralized Wazuh SIEM deployed on AWS. The platform provides unified visibility across cloud control planes and local perimeter defenses, backed by a custom AI SOC Agent that uses **local Ollama by default** (with optional Google Gemini support) and ChromaDB retrieval for Tier-1 incident triage and remediation reporting.
+An autonomous hybrid security operations monitoring infrastructure integrating Amazon Web Services (AWS) cloud telemetry and an on-premise MikroTik edge router into a centralized Wazuh SIEM deployed on AWS. The platform provides unified visibility across cloud control planes and local perimeter defenses, backed by a bounded AI SOC Agent. Local Ollama is the default model runtime, with optional Google Gemini support. The agent can adaptively call read-only tools against ChromaDB incident memory, Wazuh Indexer telemetry, and configured threat-intelligence providers. Tool calls are validated and audited locally. TheHive case creation is an optional post-investigation operation and is reported as created only after a real API response confirms it.
 
 ---
 
@@ -16,9 +16,14 @@ export SOC_LLM_PROVIDER=ollama
 export SOC_OLLAMA_URL=http://127.0.0.1:11434/api/chat
 export SOC_OLLAMA_MODEL=qwen2.5:7b
 export SOC_OLLAMA_TIMEOUT_SECONDS=180
+export SOC_AGENT_MAX_TOOL_STEPS=6
+export SOC_AUDIT_LOG_PATH=logs/agent_audit.jsonl
+export SOC_THEHIVE_AUTO_CREATE=false
 ```
 
-Use `SOC_OLLAMA_URL` to point at a protected local endpoint or an explicitly configured SSH tunnel. Do not expose Ollama's API directly to the public internet. To use the optional Gemini path, set `SOC_LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, and optionally `GEMINI_MODEL`.
+Use `SOC_OLLAMA_URL` to point at a protected local endpoint or an explicitly configured SSH tunnel. Do not expose Ollama's API directly to the public internet. Choose a model that supports tool calling. To use the optional Gemini path, set `SOC_LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, and optionally `GEMINI_MODEL`.
+
+The investigation loop defaults to six tool calls per alert and clamps the configured budget to twelve. The JSONL audit log is written to the configured path, which defaults to logs/agent_audit.jsonl. To create real TheHive cases, set THEHIVE_URL and THEHIVE_API_KEY, then explicitly enable SOC_THEHIVE_AUTO_CREATE=true. TLS verification is enabled by default; install a trusted certificate or set THEHIVE_VERIFY_TLS=false only in an isolated test lab.
 
 
 ### Verification, Containment, and Transport
@@ -26,7 +31,10 @@ Use `SOC_OLLAMA_URL` to point at a protected local endpoint or an explicitly con
 - **Classification is evidence-based triage:** a Wazuh rule level determines prioritization, not proof of compromise. Reports without enough evidence default to `suspicious` / human review rather than an automatically confirmed true positive.
 - **Containment is not currently automated:** `trigger_containment_action` returns `NOT_CONFIGURED` and `not_executed`. It deliberately does not claim to isolate a host or block an address. A real Wazuh Active Response adapter must be configured, tested, and audited before automated containment is enabled.
 - **Dashboard status reflects recorded evidence:** new records default to `Not executed`. An event is only shown as `Executed & Verified` when its stored status explicitly says `EXECUTED_AND_VERIFIED`.
-- **Threat-intelligence and audit claims must come from tool results:** the agent should not invent HTTP status codes, provider successes, prior matches, or actions.
+- **Threat-intelligence status is explicit:** missing keys, API errors, and rate limits are recorded as unavailable or partial results, not as a clean reputation result.
+- **Adaptive investigation:** the model selects read-only tools based on the incoming alert, receives results, and reassesses before choosing the next step. Agent-scoped Indexer searches are restricted to the alert's agent ID; IP/hash lookups must reference observed indicators.
+- **Tool audit trail:** each tool attempt records the incident ID, tool name, bounded arguments, result status, duration, and a short result excerpt in a local JSONL file. The audit log is excluded from Git.
+- **TheHive is opt-in:** the model cannot create cases directly. A separate orchestration step can create one only after the report, when SOC_THEHIVE_AUTO_CREATE=true and THEHIVE_API_KEY are configured. No credentials means no case creation.
 - **TLS verification:** Wazuh API requests verify TLS by default through `WAZUH_API_VERIFY_TLS=true`. For an isolated test lab with a self-signed certificate only, this can be set to `false`; prefer installing/trusting the correct certificate instead of disabling verification.
 - **Existing vector-store records:** metadata created before these changes may not contain rule-level or containment-status fields. The dashboard treats absent containment status as `Not executed`, but historical classifications may still reflect the older classifier and should be reviewed before using them as ground truth.
 
@@ -118,8 +126,12 @@ v
 │   ├── ai-triage-report.png                # Sample automated AI investigation output
 │   └── openvpn-status.png                  # Active Site-to-Cloud tunnel verification
 └── scripts/
-    ├── soc_agent.py                        # Autonomous AI triage engine using Gemini API
-    ├── agent_tools.py                      # Telemetry parsing, vector search, and threat tools
+    ├── soc_agent.py                        # Alert intake, report generation, memory persistence, optional TheHive case
+    ├── investigation_agent.py              # Bounded adaptive tool loop, policy checks, and JSONL audit trail
+    ├── agent_tools.py                      # Read-only evidence tools and controlled tool dispatch
+    ├── indexer_tool.py                     # Wazuh Indexer process, network, and related-alert queries
+    ├── threat_intel.py                     # Reputation checks with explicit provider status
+    ├── thehive_tool.py                     # Optional TheHive case/observable/task adapter
     └── requirements.txt                    # Python runtime dependencies
 Implementation & Integration Steps
 1. AWS Cloud Integration with Wazuh
@@ -144,7 +156,7 @@ Implemented regex decoders and custom rules (Rule IDs 100100+) to parse RouterOS
 4. Autonomous AI SOC Agent Integration
 Developed an AI triage pipeline in Python (soc_agent.py) triggered by high-severity Wazuh alerts.
 
-Configured the SOC agent to use the local Ollama HTTP API by default (model: `qwen2.5:7b`), with Google Gemini available when `SOC_LLM_PROVIDER=gemini`. Local Ollama mode includes ChromaDB history retrieval and does not query external threat-intelligence services.
+Configured the SOC agent to use the local Ollama HTTP API by default (model: `qwen2.5:7b`), with Google Gemini available when `SOC_LLM_PROVIDER=gemini`. Both provider paths can adaptively call the bounded read-only tool set, including ChromaDB history retrieval, Wazuh Indexer searches, and configured threat-intelligence checks.
 
 Integrated ChromaDB vector store for similarity search across historical incidents to enrich investigation reports.
 
@@ -164,6 +176,6 @@ Project Roadmap
 
 [x] Custom Log Decoders and Detection Rule Engineering
 
-[x] AI-Driven Threat Triage: Autonomous investigation agent integrating Gemini API and vector retrieval for automated incident analysis.
+[x] AI-Driven Threat Triage: Ollama/Gemini adaptive tool calling with ChromaDB memory, Wazuh Indexer enrichment, provider-status validation, and tool audit logging.
 
-[ ] Automated Active Response: Implement automated firewall rules to dynamically block offending IPs on MikroTik.
+[ ] Automated Active Response: Real endpoint isolation or MikroTik/Wazuh response adapters are not implemented. The current agent records recommendations and does not execute containment.
