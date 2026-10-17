@@ -113,6 +113,77 @@ def query_network_activity(agent_id: str, time_range_minutes: int = 30) -> str:
     except Exception as e:
         return f"Error querying Indexer for network activity: {str(e)}"
 
+def query_related_alerts(agent_id: str, query_text: str = "", time_range_minutes: int = 60, size: int = 10) -> str:
+    """Search recent Wazuh alerts for one agent, optionally ranked by investigative context."""
+    try:
+        minutes = max(1, min(int(time_range_minutes), 240))
+    except (TypeError, ValueError):
+        minutes = 60
+    try:
+        limit = max(1, min(int(size), 25))
+    except (TypeError, ValueError):
+        limit = 10
+
+    query_text = str(query_text or "").strip()[:500]
+    bool_query = {
+        "must": [{"match": {"agent.id": str(agent_id)}}],
+        "filter": [{"range": {"timestamp": {"gte": "now-{}m".format(minutes)}}}],
+    }
+    if query_text:
+        bool_query["should"] = [{
+            "multi_match": {
+                "query": query_text,
+                "fields": [
+                    "rule.description^3", "rule.id^2", "full_log",
+                    "data.srcip", "data.dstip", "agent.name",
+                ],
+                "type": "best_fields",
+                "operator": "or",
+            }
+        }]
+        bool_query["minimum_should_match"] = 0
+
+    query = {
+        "query": {"bool": bool_query},
+        "size": limit,
+        "sort": [{"_score": {"order": "desc"}}, {"timestamp": {"order": "desc"}}],
+    }
+    try:
+        response = get_opensearch_client().search(body=query, index="wazuh-alerts-4.x-*")
+        hits = response.get("hits", {}).get("hits", [])
+        alerts = []
+        for hit in hits:
+            src = hit.get("_source", {})
+            data = src.get("data") or {}
+            rule = src.get("rule") or {}
+            agent = src.get("agent") or {}
+            alerts.append({
+                "timestamp": src.get("timestamp"),
+                "agent_id": agent.get("id"),
+                "agent_name": agent.get("name"),
+                "rule_id": rule.get("id"),
+                "rule_level": rule.get("level"),
+                "rule_description": rule.get("description"),
+                "source_ip": data.get("srcip") or data.get("src_ip"),
+                "destination_ip": data.get("dstip") or data.get("dst_ip"),
+                "user": data.get("dstuser") or data.get("srcuser") or data.get("user"),
+                "full_log": str(src.get("full_log") or "")[:1200],
+            })
+        return json.dumps({
+            "status": "success" if alerts else "empty",
+            "agent_id": str(agent_id),
+            "time_range_minutes": minutes,
+            "count": len(alerts),
+            "alerts": alerts,
+        }, ensure_ascii=False, default=str)
+    except Exception as exc:
+        return json.dumps({
+            "status": "error",
+            "agent_id": str(agent_id),
+            "message": "Wazuh Indexer related-alert query failed: {}".format(exc),
+        }, ensure_ascii=False)
+
+
 if __name__ == "__main__":
     print("[*] Testing Wazuh Indexer connectivity...")
     test_agent_id = "001"
