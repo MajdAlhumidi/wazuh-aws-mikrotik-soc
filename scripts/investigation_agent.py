@@ -104,7 +104,7 @@ def _write_audit_event(event: dict) -> bool:
 
 
 def _argument_preview(arguments: dict) -> dict:
-    return {key: (value if isinstance(value, (int, float, bool)) or value is None else str(value)[:300)
+    return {key: (value if isinstance(value, (int, float, bool)) or value is None else str(value)[:300])
             for key, value in (arguments or {}).items()}
 
 
