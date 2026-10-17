@@ -358,8 +358,13 @@ def _maybe_create_thehive_case(alert_json: dict, report_text: str) -> dict:
 
 def _append_case_result(report_text: str, result: dict) -> str:
     status = str(result.get("status", "unknown")).lower()
-    if status in {"success", "created"} and result.get("case_id"):
-        details = "- Status: Created in TheHive; case ID: {}".format(result["case_id"])
+    if status in {"success", "created", "partial"} and result.get("case_id"):
+        details = "- Status: Created in TheHive\n- Case ID: {}".format(result["case_id"])
+        if result.get("message"):
+            details += "\n- Details: {}".format(result["message"])
+        if status == "partial":
+            followup_errors = json.dumps(result.get("followup_errors", []), ensure_ascii=False)[:500]
+            details += "\n- Follow-up note: one or more observables/tasks were not confirmed; inspect adapter output. " + followup_errors
     elif status == "not_attempted":
         details = "- Status: Not attempted; set SOC_THEHIVE_AUTO_CREATE=true to enable the integration."
     elif status == "not_configured":
