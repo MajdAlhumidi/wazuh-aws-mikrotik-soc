@@ -3,7 +3,7 @@ import json
 import requests
 
 from vector_store import search_incidents
-from indexer_tool import query_process_tree, query_network_activity
+from indexer_tool import query_process_tree, query_network_activity, query_related_alerts
 from thehive_tool import create_thehive_incident_case
 from threat_intel import check_ip_reputation as get_ip_intel, check_file_hash as get_hash_intel
 
@@ -29,24 +29,20 @@ def get_wazuh_token() -> str:
         return ""
 
 
-def search_related_agent_logs(agent_id: str, query: str) -> str:
-    token = get_wazuh_token()
-    if not token:
-        return json.dumps({"status": "error", "message": "Wazuh API unreachable or unauthenticated."})
-
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {"q": query, "limit": 5}
+def search_related_agent_logs(agent_id: str, query: str, time_range_minutes: int = 60) -> str:
+    """Search recent Wazuh alerts for the incoming agent, not file-integrity scan metadata."""
     try:
-        res = requests.get(
-            f"{WAZUH_HOST}/syscheck/{agent_id}/last_scan",
-            headers=headers,
-            params=params,
-            verify=WAZUH_API_VERIFY_TLS,
-            timeout=5
+        return query_related_alerts(
+            agent_id=str(agent_id),
+            query_text=str(query or ""),
+            time_range_minutes=int(time_range_minutes),
+            size=10,
         )
-        return json.dumps(res.json().get("data", {}))
-    except Exception as e:
-        return json.dumps({"status": "error", "message": f"Error querying Wazuh: {str(e)}"})
+    except Exception as exc:
+        return json.dumps({
+            "status": "error",
+            "message": "Related-alert search failed: {}".format(exc),
+        }, ensure_ascii=False)
 
 
 def check_ip_reputation(ip: str) -> str:
@@ -142,15 +138,15 @@ def inspect_network_connections(agent_id: str, time_range_minutes: int = 30) -> 
         return json.dumps({"status": "error", "message": f"Network activity query failed: {str(e)}"})
 
 
+# Only read-only evidence tools are exposed to the autonomous model loop.
+# Containment is not implemented; TheHive creation is orchestrated after investigation.
 SOC_TOOLS_LIST = [
     search_historical_incidents,
     inspect_process_tree,
     inspect_network_connections,
+    search_related_agent_logs,
     check_ip_reputation,
     inspect_file_hash,
-    search_related_agent_logs,
-    trigger_containment_action,
-    create_thehive_incident_case
 ]
 
 AVAILABLE_TOOLS = {
