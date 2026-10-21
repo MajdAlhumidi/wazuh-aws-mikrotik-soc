@@ -113,13 +113,23 @@ def search_historical_incidents(query: str, n_results: int = 2) -> str:
             matched_cases.append({
                 "incident_id": meta.get("incident_id"),
                 "classification": meta.get("classification"),
+                "human_review_status": meta.get("human_review_status", "unknown"),
+                "classification_source": meta.get("classification_source", "unknown"),
                 "rule_name": meta.get("rule_name"),
                 "analyst_notes": meta.get("analyst_notes"),
                 "similarity_distance": round(dist, 4),
                 "summary": results["documents"][0][i]
             })
 
-        return json.dumps({"status": "success", "matches_count": len(matched_cases), "historical_cases": matched_cases})
+        return json.dumps({
+            "status": "success",
+            "matches_count": len(matched_cases),
+            "historical_cases": matched_cases,
+            "interpretation_note": (
+                "Historical labels are context only. Most legacy records may have unknown review status; "
+                "do not treat them as verified ground truth unless human_review_status explicitly indicates review."
+            )
+        }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"status": "error", "message": f"Vector DB search failed: {str(e)}"})
 

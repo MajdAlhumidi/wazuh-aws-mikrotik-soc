@@ -49,7 +49,14 @@ def query_process_tree(agent_id: str, time_range_minutes: int = 30) -> str:
         hits = response["hits"]["hits"]
         
         if not hits:
-            return f"No raw process creation logs found for Agent {agent_id} in the last {time_range_minutes}m."
+            return json.dumps({
+                "status": "empty",
+                "agent_id": str(agent_id),
+                "time_range_minutes": int(time_range_minutes),
+                "count": 0,
+                "events": [],
+                "message": "No process-creation evidence was returned for this query window."
+            }, ensure_ascii=False)
         
         extracted_events = []
         for hit in hits:
@@ -67,9 +74,19 @@ def query_process_tree(agent_id: str, time_range_minutes: int = 30) -> str:
             }
             extracted_events.append(event_summary)
             
-        return json.dumps(extracted_events, indent=2)
+        return json.dumps({
+            "status": "success",
+            "agent_id": str(agent_id),
+            "time_range_minutes": int(time_range_minutes),
+            "count": len(extracted_events),
+            "events": extracted_events
+        }, ensure_ascii=False, indent=2)
     except Exception as e:
-        return f"Error querying Indexer for process tree: {str(e)}"
+        return json.dumps({
+            "status": "error",
+            "agent_id": str(agent_id),
+            "message": "Indexer process-evidence query failed: {}".format(e)
+        }, ensure_ascii=False)
 
 def query_network_activity(agent_id: str, time_range_minutes: int = 30) -> str:
     client = get_opensearch_client()
@@ -97,7 +114,14 @@ def query_network_activity(agent_id: str, time_range_minutes: int = 30) -> str:
         hits = response["hits"]["hits"]
         
         if not hits:
-            return f"No network connection logs found for Agent {agent_id} in the last {time_range_minutes}m."
+            return json.dumps({
+                "status": "empty",
+                "agent_id": str(agent_id),
+                "time_range_minutes": int(time_range_minutes),
+                "count": 0,
+                "connections": [],
+                "message": "No network-connection evidence was returned for this query window."
+            }, ensure_ascii=False)
             
         extracted_conns = []
         for hit in hits:
@@ -113,9 +137,19 @@ def query_network_activity(agent_id: str, time_range_minutes: int = 30) -> str:
             }
             extracted_conns.append(conn_summary)
             
-        return json.dumps(extracted_conns, indent=2)
+        return json.dumps({
+            "status": "success",
+            "agent_id": str(agent_id),
+            "time_range_minutes": int(time_range_minutes),
+            "count": len(extracted_conns),
+            "connections": extracted_conns
+        }, ensure_ascii=False, indent=2)
     except Exception as e:
-        return f"Error querying Indexer for network activity: {str(e)}"
+        return json.dumps({
+            "status": "error",
+            "agent_id": str(agent_id),
+            "message": "Indexer network-evidence query failed: {}".format(e)
+        }, ensure_ascii=False)
 
 def query_related_alerts(agent_id: str, query_text: str = "", time_range_minutes: int = 60, size: int = 10) -> str:
     """Search recent Wazuh alerts for one agent, optionally ranked by investigative context."""
