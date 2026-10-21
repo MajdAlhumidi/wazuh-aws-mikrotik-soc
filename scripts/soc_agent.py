@@ -20,6 +20,11 @@ from investigation_agent import (
     render_tool_trace,
     run_dynamic_ollama_agent,
 )
+from report_quality import (
+    append_output_quality_gate,
+    enforce_runtime_containment_status,
+    evaluate_report_quality,
+)
 
 STREAM_API_URL = "http://127.0.0.1:8000/api/broadcast"
 
@@ -57,6 +62,9 @@ When an alert is provided:
 4. An unsuccessful login attempt alone does not prove compromise, valid-account abuse, credential dumping, or remote-service exploitation. Use MITRE ATT&CK only when the supplied evidence supports the technique.
 5. Never state that containment was executed unless a real tool response confirms execution. The configured containment tool currently reports NOT_CONFIGURED / not_executed, so describe actions as recommendations or not executed.
 6. Never claim an HTTP status, threat-intelligence provider success, or historical match unless supported by a tool result.
+7. Historical labels are contextual clues, not ground truth unless the returned metadata explicitly confirms human review.
+8. Before finalizing, check that each factual claim has supporting evidence, missing evidence is stated, and recommendations are proportionate to the observed activity.
+9. Use the exact required headings and explicit classification. If the report is incomplete, state the limitation and require human review.
 
 4. MANDATORY OUTPUT STRUCTURE:
 You MUST produce the final investigation report strictly formatted in Markdown:
@@ -214,7 +222,7 @@ def generate_fallback_report(alert_json: dict, error_msg: str) -> str:
 
     return f"""# Incident Investigation Report (FALLBACK CONTINGENCY)
 
-> **Execution Context**: Configured LLM provider unavailable ({error_msg}). Processed via Local Deterministic Engine.
+> **Execution Context**: Configured LLM provider unavailable; processed via Local Deterministic Engine. Detailed error information remains in server logs.
 
 ---
 
@@ -428,8 +436,25 @@ def investigate_alert(alert_json: dict):
         report_text = generate_fallback_report(alert_json, str(api_err))
         classification = extract_report_classification(report_text)
 
-    case_result = _maybe_create_thehive_case(alert_json, report_text)
+    # Replace any model-authored containment claim with the orchestrator's verified runtime state.
+    report_text = enforce_runtime_containment_status(report_text)
+    quality_passed, quality_issues = evaluate_report_quality(report_text)
+
+    # Do not create external cases from malformed/incomplete model output.
+    if quality_passed:
+        case_result = _maybe_create_thehive_case(alert_json, report_text)
+    else:
+        case_result = {
+            "status": "not_attempted",
+            "message": (
+                "The report quality gate requires human review; no automatic TheHive case was created. "
+                + " ".join(quality_issues)
+            ),
+        }
+
     report_text = _append_case_result(report_text, case_result)
+    report_text = enforce_runtime_containment_status(report_text)
+    report_text = append_output_quality_gate(report_text)
     classification = extract_report_classification(report_text)
 
     print("\n" + "#"*22 + " SOC INCIDENT REPORT " + "#"*22, flush=True)
