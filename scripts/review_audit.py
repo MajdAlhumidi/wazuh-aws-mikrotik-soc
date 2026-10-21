@@ -83,20 +83,11 @@ def append_human_review(payload: Dict[str, Any], path: Optional[str] = None) -> 
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(destination, flags, 0o600)
+    with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
     try:
-        with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
-        try:
-            os.chmod(destination, 0o600)
-        except OSError:
-            pass
-    except Exception:
-        # fdopen owns the descriptor after it succeeds. If fdopen itself fails,
-        # close defensively without hiding the original exception.
-        try:
-            os.close(descriptor)
-        except OSError:
-            pass
-        raise
+        os.chmod(destination, 0o600)
+    except OSError:
+        pass
 
     return record
