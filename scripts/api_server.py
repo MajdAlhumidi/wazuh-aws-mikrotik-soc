@@ -1,11 +1,13 @@
 import os
 import json
+import hmac
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from typing import List, Dict, Any, Optional, Literal
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import chromadb
+from review_audit import append_human_review
 
 app = FastAPI(title="Cyber SOC Command Center")
 
@@ -112,6 +114,17 @@ class ExternalAlertInput(BaseModel):
     llm_model: str = "unknown"
     fallback_used: Optional[bool] = None
 
+
+class HumanReviewInput(BaseModel):
+    incident_id: str = Field(..., min_length=1, max_length=128)
+    agent_classification: Literal["true_positive", "false_positive", "suspicious", "benign", "unknown"]
+    decision: Literal["accepted", "corrected", "escalated"]
+    final_classification: Optional[Literal["true_positive", "false_positive", "suspicious", "benign", "unknown"]] = None
+    reviewer: str = Field(..., min_length=1, max_length=128)
+    notes: str = Field(default="", max_length=2000)
+    agent_recommendations: List[str] = Field(default_factory=list, max_items=10)
+
+
 @app.post("/api/broadcast")
 async def ingest_real_agent_alert(alert: ExternalAlertInput):
     """بث التقرير المحفوظ في ChromaDB إلى المتصفح لحظياً"""
@@ -151,6 +164,41 @@ async def ingest_real_agent_alert(alert: ExternalAlertInput):
 
     await manager.broadcast({"type": "NEW_ALERT", "incident": new_record})
     return {"status": "broadcasted", "case_id": new_record["case_id"]}
+
+
+@app.post("/api/reviews")
+async def record_human_review(
+    review: HumanReviewInput,
+    x_review_token: Optional[str] = Header(default=None, alias="X-Review-Token"),
+):
+    """Record an analyst decision separately from the agent suggestion.
+
+    Configure SOC_REVIEW_API_TOKEN to enable the route. It is disabled by default.
+    """
+    expected_token = os.getenv("SOC_REVIEW_API_TOKEN", "").strip()
+    if not expected_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Human review recording is disabled; configure SOC_REVIEW_API_TOKEN.",
+        )
+    if not x_review_token or not hmac.compare_digest(x_review_token, expected_token):
+        raise HTTPException(status_code=401, detail="Invalid review token.")
+
+    try:
+        record = append_human_review(review.dict())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except OSError:
+        raise HTTPException(status_code=500, detail="Could not persist the human review record.")
+
+    return {
+        "status": "recorded",
+        "review_id": record["review_id"],
+        "incident_id": record["incident_id"],
+        "human_decision": record["human_decision"],
+        "final_classification": record["final_classification"],
+    }
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
