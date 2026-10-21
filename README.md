@@ -32,8 +32,13 @@ The investigation loop defaults to six tool calls per alert and clamps the confi
 - **Containment is not currently automated:** `trigger_containment_action` returns `NOT_CONFIGURED` and `not_executed`. It deliberately does not claim to isolate a host or block an address. A real Wazuh Active Response adapter must be configured, tested, and audited before automated containment is enabled.
 - **Dashboard status reflects recorded evidence:** new records default to `Not executed`. An event is only shown as `Executed & Verified` when its stored status explicitly says `EXECUTED_AND_VERIFIED`.
 - **Threat-intelligence status is explicit:** missing keys, API errors, and rate limits are recorded as unavailable or partial results, not as a clean reputation result.
+- **External IP privacy guard:** third-party IP reputation lookups are blocked for non-global addresses (including private, loopback, link-local, reserved, and documentation ranges), even when such an address appears in the alert. IPs must also be observed in the alert or collected endpoint evidence.
 - **Adaptive investigation:** the model selects read-only tools based on the incoming alert, receives results, and reassesses before choosing the next step. Agent-scoped Indexer searches are restricted to the alert's agent ID; IP/hash lookups must reference observed indicators.
-- **Tool audit trail:** each tool attempt records the incident ID, tool name, bounded arguments, result status, duration, and a short result excerpt in a local JSONL file. The audit log is excluded from Git.
+- **Structured evidence status:** process and network evidence queries return explicit `success`, `empty`, or `error` statuses so the agent can distinguish missing evidence from query failures.
+- **Tool audit trail:** each tool attempt records the incident ID, tool name, bounded arguments, result status, duration, and a short result excerpt in a local JSONL file. If audit writing fails, the agent tool trace explicitly flags the incomplete durable audit trail. The audit log is excluded from Git.
+- **Report quality gate:** the orchestrator checks the report title, required sections, and explicit classification. Incomplete reports are marked `REVIEW_REQUIRED` and cannot trigger optional automatic TheHive case creation. This structural check is not proof that the findings are correct.
+- **Runtime-verified action status:** the final report's containment section is replaced with the actual policy status: this version exposes read-only tools and does not execute containment. TheHive case creation is tracked separately.
+- **Historical memory caution:** ChromaDB results include the available human-review metadata. Legacy records default to review status `unknown`; their labels are reference context, not verified ground truth.
 - **TheHive is opt-in:** the model cannot create cases directly. A separate orchestration step can create one only after the report, when SOC_THEHIVE_AUTO_CREATE=true and THEHIVE_API_KEY are configured. No credentials means no case creation.
 - **TLS verification:** Wazuh API and Indexer verify TLS by default through `WAZUH_API_VERIFY_TLS=true` and `WAZUH_INDEXER_VERIFY_TLS=true`. TheHive also verifies TLS by default through `THEHIVE_VERIFY_TLS=true`. In an isolated lab using self-signed certificates, each setting can be explicitly set to `false`; prefer installing and trusting the correct CA certificate.
 - **Existing vector-store records:** metadata created before these changes may not contain rule-level or containment-status fields. The dashboard treats absent containment status as `Not executed`, but historical classifications may still reflect the older classifier and should be reviewed before using them as ground truth.
@@ -99,7 +104,7 @@ v
 
 ### 3. Autonomous AI Incident Triage
 * **Automated Alert Contextualization:** Correlates high-severity Wazuh alerts against historical incidents stored in ChromaDB.
-* **Threat Scoring & Summarization:** Evaluates true-positive probability and produces plain-language executive summaries.
+* **Evidence-Based Triage & Summarization:** Produces a plain-language investigation report; the Wazuh rule level alone is not treated as proof of compromise, and insufficient evidence defaults to human review.
 * **Prescriptive Remediation:** Outlines immediate mitigation steps (e.g., firewall block rules, IAM credential revocation).
 
 ---
@@ -128,6 +133,7 @@ v
 └── scripts/
     ├── soc_agent.py                        # Alert intake, report generation, memory persistence, optional TheHive case
     ├── investigation_agent.py              # Bounded adaptive tool loop, policy checks, and JSONL audit trail
+    ├── report_quality.py                   # Runtime containment-status enforcement and report structure quality gate
     ├── agent_tools.py                      # Read-only evidence tools and controlled tool dispatch
     ├── indexer_tool.py                     # Wazuh Indexer process, network, and related-alert queries
     ├── threat_intel.py                     # Reputation checks with explicit provider status
