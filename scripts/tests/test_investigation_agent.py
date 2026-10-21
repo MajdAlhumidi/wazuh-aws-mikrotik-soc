@@ -47,6 +47,30 @@ class InvestigationAgentPolicyTests(unittest.TestCase):
         self.assertEqual(json.loads(result)["status"], "blocked")
         dispatch.assert_not_called()
 
+    @patch("investigation_agent._dispatch_tool")
+    def test_blocks_private_ip_even_when_observed(self, dispatch):
+        context = investigation_agent._new_context(self.alert, "INC-TEST")
+        result = investigation_agent._execute_tool(
+            context, "check_ip_reputation", {"ip": "10.0.0.15"}
+        )
+        payload = json.loads(result)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("globally routable public IPs", payload["message"])
+        dispatch.assert_not_called()
+
+    @patch("investigation_agent._write_audit_event", return_value=False)
+    @patch("investigation_agent._dispatch_tool", return_value='{"status":"success"}')
+    def test_audit_write_failure_is_visible_in_tool_trace(self, dispatch, audit_write):
+        context = investigation_agent._new_context(self.alert, "INC-TEST")
+        investigation_agent._execute_tool(
+            context, "search_historical_incidents", {"query": "test alert"}
+        )
+        trace = investigation_agent.render_tool_trace(context)
+        self.assertIn("Audit warning", trace)
+        self.assertIn("incomplete durable tool audit trail", trace)
+        dispatch.assert_called_once()
+        audit_write.assert_called_once()
+
     @patch(
         "investigation_agent._dispatch_tool",
         return_value='{"status":"success","matches_count":1}',
