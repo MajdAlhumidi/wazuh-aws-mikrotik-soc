@@ -39,6 +39,38 @@ The investigation loop defaults to six tool calls per alert and clamps the confi
 - **Report quality gate:** the orchestrator checks the report title, required sections, and explicit classification. Incomplete reports are marked `REVIEW_REQUIRED` and cannot trigger optional automatic TheHive case creation. This structural check is not proof that the findings are correct.
 - **Runtime-verified action status:** the final report's containment section is replaced with the actual policy status: this version exposes read-only tools and does not execute containment. TheHive case creation is tracked separately.
 - **Historical memory caution:** ChromaDB results include the available human-review metadata. Legacy records default to review status `unknown`; their labels are reference context, not verified ground truth.
+
+### Recording the Human Decision
+
+The agent suggestion and the analyst's final decision must be stored separately. The protected `POST /api/reviews` endpoint records an append-only JSONL review event; it does not overwrite an incident or silently promote the result into trusted vector memory.
+
+Configure the API server with a strong secret kept outside Git:
+
+```bash
+export SOC_REVIEW_API_TOKEN='replace-with-a-long-random-secret'
+export SOC_HUMAN_REVIEW_LOG_PATH='logs/human_reviews.jsonl'
+```
+
+Restart the API service after adding these variables to its service environment. The route remains disabled and returns HTTP 503 when `SOC_REVIEW_API_TOKEN` is not configured. Requests require the `X-Review-Token` header and are compared in constant time.
+
+Example review request using fictional data:
+
+```bash
+curl -sS http://127.0.0.1:8000/api/reviews \
+  -H "X-Review-Token: ${SOC_REVIEW_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "incident_id": "INC-DEMO-0001",
+    "agent_classification": "suspicious",
+    "decision": "corrected",
+    "final_classification": "false_positive",
+    "reviewer": "analyst-01",
+    "notes": "Approved maintenance activity was confirmed during review.",
+    "agent_recommendations": ["Review authentication events around the alert timestamp"]
+  }'
+```
+
+Allowed decisions are `accepted`, `corrected`, or `escalated`. An accepted review retains the agent classification, a correction requires a different final classification, and an escalation leaves the final classification unset. Records are appended with restrictive file permissions (0600) where supported. Review events are not yet automatically fed back into ChromaDB; curate and validate reviewed cases before using them as trusted memory.
 - **TheHive is opt-in:** the model cannot create cases directly. A separate orchestration step can create one only after the report, when SOC_THEHIVE_AUTO_CREATE=true and THEHIVE_API_KEY are configured. No credentials means no case creation.
 - **TLS verification:** Wazuh API and Indexer verify TLS by default through `WAZUH_API_VERIFY_TLS=true` and `WAZUH_INDEXER_VERIFY_TLS=true`. TheHive also verifies TLS by default through `THEHIVE_VERIFY_TLS=true`. In an isolated lab using self-signed certificates, each setting can be explicitly set to `false`; prefer installing and trusting the correct CA certificate.
 - **Existing vector-store records:** metadata created before these changes may not contain rule-level or containment-status fields. The dashboard treats absent containment status as `Not executed`, but historical classifications may still reflect the older classifier and should be reviewed before using them as ground truth.
