@@ -1,0 +1,68 @@
+[
+  {
+    "id": "SHAM-GOV-001",
+    "title": "Security governance and accountability",
+    "domain": "Govern",
+    "description": "Document security ownership, decision authority, escalation paths, and review responsibilities."
+  },
+  {
+    "id": "SHAM-RSK-001",
+    "title": "Cybersecurity risk assessment",
+    "domain": "Identify",
+    "description": "Maintain a risk register with an owner, likelihood, impact, treatment, and review status."
+  },
+  {
+    "id": "SHAM-AST-001",
+    "title": "Asset and telemetry source inventory",
+    "domain": "Identify",
+    "description": "Maintain an inventory of monitored hosts, network assets, cloud accounts, and log sources."
+  },
+  {
+    "id": "SHAM-IAM-001",
+    "title": "Privileged access management",
+    "domain": "Protect",
+    "description": "Restrict administrative access using least privilege, unique accounts, and MFA where supported."
+  },
+  {
+    "id": "SHAM-LOG-001",
+    "title": "Centralized logging and retention",
+    "domain": "Detect",
+    "description": "Verify that security logs are collected, time-synchronized, protected, and retained according to policy."
+  },
+  {
+    "id": "SHAM-DET-001",
+    "title": "Detection rule validation",
+    "domain": "Detect",
+    "description": "Test important Wazuh rules, document expected results, and review false-positive rates."
+  },
+  {
+    "id": "SHAM-IR-001",
+    "title": "Incident response procedure",
+    "domain": "Respond",
+    "description": "Maintain incident severity criteria, analyst handoffs, escalation procedures, and response playbooks."
+  },
+  {
+    "id": "SHAM-AI-001",
+    "title": "Human oversight of AI recommendations",
+    "domain": "Govern",
+    "description": "Require an authorized analyst to validate AI-generated classifications and approve consequential response actions."
+  },
+  {
+    "id": "SHAM-AI-002",
+    "title": "AI output traceability and evaluation",
+    "domain": "Govern",
+    "description": "Record model identity, assessment references, supporting evidence, limitations, and evaluation outcomes."
+  },
+  {
+    "id": "SHAM-DAT-001",
+    "title": "Security data handling",
+    "domain": "Protect",
+    "description": "Apply data minimization, access restrictions, retention rules, and safe handling for logs and incident evidence."
+  },
+  {
+    "id": "SHAM-REC-001",
+    "title": "Backup and recovery readiness",
+    "domain": "Recover",
+    "description": "Verify backups and periodically test recovery of critical SOC configurations, databases, and audit records."
+  }
+]
